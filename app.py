@@ -1,8 +1,45 @@
-
 import streamlit as st
 import pickle
 import pandas as pd
 import numpy as np
+
+# Airline code to full name mapping
+AIRLINE_NAMES = {
+    '9E': 'Endeavor Air', 'AA': 'American Airlines', 'AS': 'Alaska Airlines',
+    'B6': 'JetBlue Airways', 'CO': 'Continental Airlines', 'DL': 'Delta Air Lines',
+    'EV': 'ExpressJet Airlines', 'F9': 'Frontier Airlines', 'FL': 'AirTran Airways',
+    'G4': 'Allegiant Air', 'HA': 'Hawaiian Airlines', 'MQ': 'Envoy Air',
+    'NK': 'Spirit Airlines', 'NW': 'Northwest Airlines', 'OH': 'PSA Airlines',
+    'OO': 'SkyWest Airlines', 'UA': 'United Airlines', 'US': 'US Airways',
+    'VX': 'Virgin America', 'WN': 'Southwest Airlines', 'XE': 'ExpressJet',
+    'YV': 'Mesa Airlines', 'YX': 'Republic Airways',
+    'Air Wisconsin Airlines Corp': 'Air Wisconsin Airlines',
+    'Alaska Airlines Inc.': 'Alaska Airlines',
+    'Allegiant Air': 'Allegiant Air',
+    'American Airlines Inc.': 'American Airlines',
+    'Capital Cargo International': 'Capital Cargo International',
+    'Comair Inc.': 'Comair',
+    'Commutair Aka Champlain Enterprises, Inc.': 'CommutAir',
+    'Compass Airlines': 'Compass Airlines',
+    'Delta Air Lines Inc.': 'Delta Air Lines',
+    'Empire Airlines Inc.': 'Empire Airlines',
+    'Endeavor Air Inc.': 'Endeavor Air',
+    'Envoy Air': 'Envoy Air',
+    'ExpressJet Airlines Inc.': 'ExpressJet Airlines',
+    'Frontier Airlines Inc.': 'Frontier Airlines',
+    'GoJet Airlines, LLC d/b/a United Express': 'GoJet Airlines',
+    'Hawaiian Airlines Inc.': 'Hawaiian Airlines',
+    'Horizon Air': 'Horizon Air',
+    'JetBlue Airways': 'JetBlue Airways',
+    'Mesa Airlines Inc.': 'Mesa Airlines',
+    'Peninsula Airways Inc.': 'Peninsula Airways',
+    'Republic Airlines': 'Republic Airlines',
+    'SkyWest Airlines Inc.': 'SkyWest Airlines',
+    'Southwest Airlines Co.': 'Southwest Airlines',
+    'Spirit Air Lines': 'Spirit Airlines',
+    'Trans States Airlines': 'Trans States Airlines',
+    'United Air Lines Inc.': 'United Airlines',
+}
 
 # Load model
 with open('flight_delay_model.pkl', 'rb') as f:
@@ -20,6 +57,10 @@ route_delay = model_data['route_delay']
 hour_delay = model_data['hour_delay']
 month_delay = model_data['month_delay']
 
+# Create display names for airlines
+airline_display = {code: AIRLINE_NAMES.get(code, code) for code in sorted(airline_map.keys())}
+airline_options = sorted(airline_display.keys(), key=lambda x: airline_display[x])
+
 # App title
 st.title("✈️ Flight Delay & Cancellation Predictor")
 st.markdown("Predict whether your flight will be delayed or cancelled based on historical US flight data (2009-2022)")
@@ -27,7 +68,11 @@ st.markdown("Predict whether your flight will be delayed or cancelled based on h
 # Input form
 st.sidebar.header("Flight Details")
 
-airline = st.sidebar.selectbox("Airline", sorted(airline_map.keys()))
+airline_code = st.sidebar.selectbox(
+    "Airline", 
+    airline_options,
+    format_func=lambda x: airline_display[x]
+)
 origin = st.sidebar.selectbox("Origin Airport", sorted(origin_map.keys()))
 dest = st.sidebar.selectbox("Destination Airport", sorted(dest_map.keys()))
 month = st.sidebar.slider("Month", 1, 12, 7)
@@ -40,30 +85,31 @@ month_names = {1:"January",2:"February",3:"March",4:"April",5:"May",6:"June",
 
 if st.sidebar.button("Predict", type="primary"):
     route = f"{origin}_{dest}"
-
+    
     input_data = pd.DataFrame([{
         'Month': month,
         'DayofMonth': day,
         'DepHour': hour,
         'Distance': distance,
-        'Airline_code': airline_map.get(airline, 0),
+        'Airline_code': airline_map.get(airline_code, 0),
         'Origin_code': origin_map.get(origin, 0),
         'Dest_code': dest_map.get(dest, 0),
         'Route_code': route_map.get(route, 0),
-        'Airline_delay_rate': airline_delay.get(airline, 0.17),
+        'Airline_delay_rate': airline_delay.get(airline_code, 0.17),
         'Route_delay_rate': route_delay.get(route, 0.17),
         'Hour_delay_rate': hour_delay.get(hour, 0.17),
         'Month_delay_rate': month_delay.get(month, 0.17),
     }])
-
+    
     delay_prob = model.predict_proba(input_data)[0][1]
     cancel_prob = model_cancel.predict_proba(input_data)[0][1]
-
-    st.subheader(f"Results for {airline}: {origin} → {dest}")
+    
+    airline_name = airline_display[airline_code]
+    st.subheader(f"Results for {airline_name}: {origin} → {dest}")
     st.write(f"📅 {month_names[month]} {day}, departing at {hour}:00")
-
+    
     col1, col2 = st.columns(2)
-
+    
     with col1:
         st.metric("Delay Probability", f"{delay_prob*100:.1f}%")
         if delay_prob > 0.5:
@@ -72,7 +118,7 @@ if st.sidebar.button("Predict", type="primary"):
             st.warning("🟡 Moderate risk of delay")
         else:
             st.success("✅ Low risk of delay")
-
+    
     with col2:
         st.metric("Cancellation Probability", f"{cancel_prob*100:.1f}%")
         if cancel_prob > 0.1:
@@ -81,12 +127,12 @@ if st.sidebar.button("Predict", type="primary"):
             st.warning("🟡 Moderate risk of cancellation")
         else:
             st.success("✅ Low risk of cancellation")
-
+    
     # Historical stats
     st.subheader("📊 Historical Statistics")
     col3, col4, col5 = st.columns(3)
     with col3:
-        st.metric("Airline avg delay rate", f"{airline_delay.get(airline, 0)*100:.1f}%")
+        st.metric("Airline avg delay rate", f"{airline_delay.get(airline_code, 0)*100:.1f}%")
     with col4:
         st.metric("Route avg delay rate", f"{route_delay.get(route, 0)*100:.1f}%")
     with col5:
