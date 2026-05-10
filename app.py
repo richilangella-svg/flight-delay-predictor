@@ -83,8 +83,15 @@ distance = st.sidebar.number_input("Distance (miles)", min_value=50, max_value=5
 month_names = {1:"January",2:"February",3:"March",4:"April",5:"May",6:"June",
                7:"July",8:"August",9:"September",10:"October",11:"November",12:"December"}
 
+import calendar
+max_days = calendar.monthrange(2024, month)[1]
+date_valid = day <= max_days
+
 if st.sidebar.button("Predict", type="primary"):
-    route = f"{origin}_{dest}"
+    if not date_valid:
+        st.error(f"❌ Invalid date: {month_names[month]} does not have {day} days. Please select a valid date.")
+    else:
+        route = f"{origin}_{dest}"
     
     input_data = pd.DataFrame([{
         'Month': month,
