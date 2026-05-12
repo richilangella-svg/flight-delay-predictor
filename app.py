@@ -115,7 +115,8 @@ if st.sidebar.button("Predict", type="primary"):
 
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Delay Probability", f"{delay_prob*100:.1f}%")
+            label1 = "Delay Probability (partially estimated)" if not route_known else "Delay Probability"
+            st.metric(label1, f"{delay_prob*100:.1f}%")
             if delay_prob > 0.5:
                 st.error("High risk of delay (>15 min)")
             elif delay_prob > 0.3:
@@ -123,7 +124,8 @@ if st.sidebar.button("Predict", type="primary"):
             else:
                 st.success("Low risk of delay")
         with col2:
-            st.metric("Cancellation Probability", f"{cancel_prob*100:.1f}%")
+            label2 = "Cancellation Probability (partially estimated)" if not route_known else "Cancellation Probability"
+            st.metric(label2, f"{cancel_prob*100:.1f}%")
             if cancel_prob > 0.1:
                 st.error("High risk of cancellation")
             elif cancel_prob > 0.05:
