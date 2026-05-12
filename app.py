@@ -41,6 +41,12 @@ AIRLINE_NAMES = {
     'United Air Lines Inc.': 'United Airlines',
 }
 
+def calibrate_cancellation_prob(raw_prob, train_rate, real_rate):
+    odds_raw = raw_prob / (1 - raw_prob + 1e-10)
+    correction = (real_rate / (1 - real_rate)) / (train_rate / (1 - train_rate))
+    odds_calibrated = odds_raw * correction
+    return odds_calibrated / (1 + odds_calibrated)
+
 with open('flight_delay_model.pkl', 'rb') as f:
     model_data = pickle.load(f)
 
@@ -55,6 +61,8 @@ airline_delay = model_data['airline_delay']
 route_delay = model_data['route_delay']
 hour_delay = model_data['hour_delay']
 month_delay = model_data['month_delay']
+real_cancel_rate = model_data.get('real_cancel_rate', 0.0195)
+train_cancel_rate = model_data.get('train_cancel_rate', 0.20)
 
 seen_names = {}
 for code in sorted(airline_map.keys()):
@@ -104,7 +112,8 @@ if st.sidebar.button("Predict", type="primary"):
         }])
 
         delay_prob = model.predict_proba(input_data)[0][1]
-        cancel_prob = model_cancel.predict_proba(input_data)[0][1]
+        raw_cancel_prob = model_cancel.predict_proba(input_data)[0][1]
+        cancel_prob = calibrate_cancellation_prob(raw_cancel_prob, train_cancel_rate, real_cancel_rate)
 
         airline_name = airline_display[airline_code]
         st.subheader(f"Results for {airline_name}: {origin} to {dest}")
@@ -126,9 +135,9 @@ if st.sidebar.button("Predict", type="primary"):
         with col2:
             label2 = "Cancellation Probability (partially estimated)" if not route_known else "Cancellation Probability"
             st.metric(label2, f"{cancel_prob*100:.1f}%")
-            if cancel_prob > 0.1:
+            if cancel_prob > 0.05:
                 st.error("High risk of cancellation")
-            elif cancel_prob > 0.05:
+            elif cancel_prob > 0.02:
                 st.warning("Moderate risk of cancellation")
             else:
                 st.success("Low risk of cancellation")
